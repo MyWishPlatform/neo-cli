@@ -20,6 +20,8 @@ using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using ECCurve = Neo.Cryptography.ECC.ECCurve;
+using ECPoint = Neo.Cryptography.ECC.ECPoint;
 
 namespace Neo.Shell
 {
@@ -144,6 +146,8 @@ namespace Neo.Shell
                     return OnCreateAddressCommand(args);
                 case "wallet":
                     return OnCreateWalletCommand(args);
+                case "multiparty":
+                    return OnCreateMultipartyCommand(args);
                 default:
                     return base.OnCommand(args);
             }
@@ -226,6 +230,47 @@ namespace Neo.Shell
                     Console.WriteLine("Wallet files in that format are not supported, please use a .json or .db3 file extension.");
                     break;
             }
+            return true;
+        }
+        
+        private bool OnCreateMultipartyCommand(string[] args)
+        {
+            if (args.Length < 3)
+            {
+                Console.WriteLine("error");
+                return true;
+            }
+
+            int minSignNum = int.Parse(args[2]);
+            int pubCount = args.Length - 3;
+            if (minSignNum > pubCount)
+            {
+                Console.WriteLine($"not enough public keys, min {minSignNum}, but was specified {pubCount}");
+            }
+            ECPoint[] pubKeys = new ECPoint[pubCount];
+            for (int i = 0; i < pubCount; i++)
+            {
+                string pub = args[i + 3];
+                pubKeys[i] = ECPoint.DecodePoint(pub.HexToBytes(), ECCurve.Secp256r1);
+            }
+            HashSet<ECPoint> pubKeysSet = new HashSet<ECPoint>(pubKeys);
+            KeyPair keyPair = Program.Wallet.GetAccounts().FirstOrDefault(p => p.HasKey && pubKeysSet.Contains(p.GetKey().PublicKey))?.GetKey();
+
+            if (keyPair == null)
+            {
+                Console.WriteLine("no one pub key are presents in wallet");
+            }
+            
+            var contract = Contract.CreateMultiSigContract(minSignNum, pubKeys);
+
+            WalletAccount account = Program.Wallet.CreateAccount(contract, keyPair);
+            if (Program.Wallet is NEP6Wallet wallet)
+            {
+                wallet.Save();                
+            }
+            
+            Console.WriteLine($"address: {account.Address}");
+
             return true;
         }
 
@@ -355,6 +400,7 @@ namespace Neo.Shell
                 "\timport key <wif|path>\n" +
                 "\texport key [address] [path]\n" +
                 "\tsend <id|alias> <address> <value>|all [fee=0]\n" +
+                "\tcreate multiparty <min.sig> <address1> <address2> ...\n" +
                 "Node Commands:\n" +
                 "\tshow state\n" +
                 "\tshow node\n" +
