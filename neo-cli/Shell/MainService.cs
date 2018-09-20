@@ -92,6 +92,8 @@ namespace Neo.Shell
                     return OnStartCommand(args);
                 case "upgrade":
                     return OnUpgradeCommand(args);
+                case "send-assets":
+                    return SendFaucetAssets(args);                    
                 default:
                     return base.OnCommand(args);
             }
@@ -1108,5 +1110,75 @@ namespace Neo.Shell
             string path = Path.Combine(Settings.Default.Paths.ApplicationLogs, $"{e.Transaction.Hash}.json");
             File.WriteAllText(path, json.ToString());
         }
+
+        private bool SendFaucetAssets(string[] args)
+        {
+            string faucetWallet = Settings.Default.UnlockWallet.Path;
+            string faucetPasswd = Settings.Default.UnlockWallet.Password;
+
+            Program.Wallet = OpenWallet(faucetWallet, faucetPasswd);
+            if (NoWallet()) return true;
+            if (!Program.Wallet.VerifyPassword(faucetPasswd))
+            {
+                Console.WriteLine("Incorrect password");
+                return true;
+            }
+
+            // script hash for receiver address
+            UInt160 receiverScriptHash = Wallet.ToScriptHash(args[1]);
+            string sendAmount = "1";
+
+            TransferOutput[] faucetTxOutputs = new TransferOutput[2];
+
+            UIntBase assetNeo = Blockchain.GoverningToken.Hash;
+            AssetDescriptor descriptorNeo = new AssetDescriptor(assetNeo);
+            BigDecimal amountNeo = BigDecimal.Parse(sendAmount, descriptorNeo.Decimals);
+
+            faucetTxOutputs[0] = new TransferOutput
+            {
+                AssetId = assetNeo,
+                Value = amountNeo,
+                ScriptHash = receiverScriptHash
+            };
+
+            UIntBase assetGas = Blockchain.UtilityToken.Hash;
+            AssetDescriptor descriptorGas = new AssetDescriptor(assetGas);
+            BigDecimal amountGas = BigDecimal.Parse(sendAmount, descriptorGas.Decimals); 
+            
+            faucetTxOutputs[1] = new TransferOutput
+            {
+                AssetId = assetGas,
+                Value = amountGas,
+                ScriptHash = receiverScriptHash
+            };
+
+            Transaction faucetDripTx = Program.Wallet.MakeTransaction(
+                null, faucetTxOutputs, fee: Fixed8.Zero);
+
+            if (faucetDripTx == null)
+            {
+                Console.WriteLine("Error in creating transaction");
+                return true;
+            }
+        
+            ContractParametersContext contextFaucetTx = new ContractParametersContext(faucetDripTx);
+            Program.Wallet.Sign(contextFaucetTx);
+            if (contextFaucetTx.Completed)
+            {
+                faucetDripTx.Scripts = contextFaucetTx.GetScripts();
+                Program.Wallet.ApplyTransaction(faucetDripTx);
+                LocalNode.Relay(faucetDripTx);
+                Console.WriteLine($"FAUCET SEND TXID: {faucetDripTx.Hash}");
+            }
+            else
+            {
+                Console.WriteLine("SignatureContext:");
+                Console.WriteLine(contextFaucetTx.ToString());
+            }
+            return true;
+        }
+
+
+
     }
 }

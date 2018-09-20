@@ -185,6 +185,61 @@ namespace Neo.Network.RPC
                             return context.ToJson();
                         }
                     }
+                case "sendfaucetassets":
+                    if (Program.Wallet == null)
+                        throw new RpcException(-400, "Access denied");
+                    else
+                    {
+                        UInt160 receiverScriptHash = Wallet.ToScriptHash(_params[0].AsString());
+                        if (_params[0].AsString().Length != 34)
+                            throw new RpcException(-32602, "address empty or invalid");
+
+                        string sendAmount = "1";
+
+                        TransferOutput[] faucetTxOutputs = new TransferOutput[2];
+
+                        UIntBase assetNeo = Blockchain.GoverningToken.Hash;
+                        AssetDescriptor descriptorNeo = new AssetDescriptor(assetNeo);
+                        BigDecimal amountNeo = BigDecimal.Parse(sendAmount, descriptorNeo.Decimals);
+                        
+                        faucetTxOutputs[0] = new TransferOutput
+                        {
+                            AssetId = assetNeo,
+                            Value = amountNeo,
+                            ScriptHash = receiverScriptHash
+                        };
+
+                        UIntBase assetGas = Blockchain.UtilityToken.Hash;
+                        AssetDescriptor descriptorGas = new AssetDescriptor(assetGas);
+                        BigDecimal amountGas = BigDecimal.Parse(sendAmount, descriptorGas.Decimals); 
+                        
+                        faucetTxOutputs[1] = new TransferOutput
+                        {
+                            AssetId = assetGas,
+                            Value = amountGas,
+                            ScriptHash = receiverScriptHash
+                        };
+
+                        Transaction faucetDripTx = Program.Wallet.MakeTransaction(
+                            null, faucetTxOutputs, fee: Fixed8.Zero);
+
+                        if (faucetDripTx == null)
+                            throw new RpcException(-300, "transaction not created successfully");
+
+                        ContractParametersContext contextFaucetTx = new ContractParametersContext(faucetDripTx);
+                        Program.Wallet.Sign(contextFaucetTx);
+                        if (contextFaucetTx.Completed)
+                        {
+                            faucetDripTx.Scripts = contextFaucetTx.GetScripts();
+                            Program.Wallet.ApplyTransaction(faucetDripTx);
+                            LocalNode.Relay(faucetDripTx);
+                            return faucetDripTx.ToJson();
+                        }
+                        else
+                        {
+                            return contextFaucetTx.ToJson();
+                        }
+                    }
                 case "getnewaddress":
                     if (Program.Wallet == null)
                         throw new RpcException(-400, "Access denied");
