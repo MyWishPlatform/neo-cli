@@ -194,14 +194,17 @@ namespace Neo.Network.RPC
                         if (_params[0].AsString().Length != 34)
                             throw new RpcException(-32602, "address empty or invalid");
 
-                        string sendAmount = "1";
+                        // amount of NEO and GAS assets to send
+                        string sendAmount = "1000";
 
                         TransferOutput[] faucetTxOutputs = new TransferOutput[2];
 
+                        // using system NEO asset and descriptor, convert amount to BigDecimal
                         UIntBase assetNeo = Blockchain.GoverningToken.Hash;
                         AssetDescriptor descriptorNeo = new AssetDescriptor(assetNeo);
                         BigDecimal amountNeo = BigDecimal.Parse(sendAmount, descriptorNeo.Decimals);
 
+                        // constructing first output (NEO ASSET) for faucet TX
                         faucetTxOutputs[0] = new TransferOutput
                         {
                             AssetId = assetNeo,
@@ -209,10 +212,12 @@ namespace Neo.Network.RPC
                             ScriptHash = receiverScriptHash
                         };
 
+                        // using system NEO-GAS asset and descriptor, also convert amount
                         UIntBase assetGas = Blockchain.UtilityToken.Hash;
                         AssetDescriptor descriptorGas = new AssetDescriptor(assetGas);
                         BigDecimal amountGas = BigDecimal.Parse(sendAmount, descriptorGas.Decimals);
 
+                        // constructing second output (NEO-GAS ASSET) for faucet TX
                         faucetTxOutputs[1] = new TransferOutput
                         {
                             AssetId = assetGas,
@@ -220,12 +225,15 @@ namespace Neo.Network.RPC
                             ScriptHash = receiverScriptHash
                         };
 
+                        // generating transaction itself with zero fee
                         Transaction faucetDripTx = Program.Wallet.MakeTransaction(
                             null, faucetTxOutputs, fee: Fixed8.Zero);
 
+                        // check for errors
                         if (faucetDripTx == null)
                             throw new RpcException(-300, "transaction not created successfully");
 
+                        // creating context, sign tx and relay to blockchain
                         ContractParametersContext contextFaucetTx = new ContractParametersContext(faucetDripTx);
                         Program.Wallet.Sign(contextFaucetTx);
                         if (contextFaucetTx.Completed)
