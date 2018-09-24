@@ -201,7 +201,7 @@ namespace Neo.Network.RPC
                         UIntBase assetNeo = Blockchain.GoverningToken.Hash;
                         AssetDescriptor descriptorNeo = new AssetDescriptor(assetNeo);
                         BigDecimal amountNeo = BigDecimal.Parse(sendAmount, descriptorNeo.Decimals);
-                        
+
                         faucetTxOutputs[0] = new TransferOutput
                         {
                             AssetId = assetNeo,
@@ -211,8 +211,8 @@ namespace Neo.Network.RPC
 
                         UIntBase assetGas = Blockchain.UtilityToken.Hash;
                         AssetDescriptor descriptorGas = new AssetDescriptor(assetGas);
-                        BigDecimal amountGas = BigDecimal.Parse(sendAmount, descriptorGas.Decimals); 
-                        
+                        BigDecimal amountGas = BigDecimal.Parse(sendAmount, descriptorGas.Decimals);
+
                         faucetTxOutputs[1] = new TransferOutput
                         {
                             AssetId = assetGas,
