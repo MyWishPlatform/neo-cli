@@ -195,7 +195,7 @@ namespace Neo.Network.RPC
                             throw new RpcException(-32602, "address empty or invalid");
 
                         // amount of NEO and GAS assets to send
-                        string sendAmount = "3000";
+                        string sendAmount = "1000";
 
                         TransferOutput[] faucetTxOutputs = new TransferOutput[2];
 
